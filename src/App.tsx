@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './context/AuthContext';
 import { AppProvider } from './context/AppContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { ToastProvider } from './components/ui/Toast';
 import { 
   LoginPage,
   DashboardPage,
@@ -21,9 +22,10 @@ import './App.css';
 function App() {
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <AppProvider>
-          <Router>
+      <ToastProvider>
+        <AuthProvider>
+          <AppProvider>
+            <Router>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
               
@@ -61,7 +63,8 @@ function App() {
           </Router>
         </AppProvider>
       </AuthProvider>
-    </ThemeProvider>
+    </ToastProvider>
+  </ThemeProvider>
   );
 }
 

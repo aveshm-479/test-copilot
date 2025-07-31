@@ -169,7 +169,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         className={cn(buttonVariants({ variant, size, animation, className }))}
         disabled={isDisabled}
         onClick={handleClick}
-        {...props}
+        {...(props as any)}
       >
         {buttonContent}
       </motion.button>

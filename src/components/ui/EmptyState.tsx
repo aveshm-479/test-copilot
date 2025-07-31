@@ -201,7 +201,7 @@ export const ErrorBoundaryFallback = ({
         Reload page
       </Button>
     </div>
-    {process.env.NODE_ENV === 'development' && (
+    {import.meta.env.DEV && (
       <details className="mt-6 w-full max-w-2xl">
         <summary className="cursor-pointer text-red-600 dark:text-red-400 text-sm mb-2">
           Error details (development only)

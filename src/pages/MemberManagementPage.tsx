@@ -6,7 +6,6 @@ import {
   PlusCircleIcon,
   UsersIcon,
   FunnelIcon,
-  MagnifyingGlassIcon,
   TagIcon,
   PhoneIcon,
   EnvelopeIcon
@@ -18,6 +17,10 @@ import { useApp } from '../hooks/useApp';
 import DashboardLayout from '../components/layout/DashboardLayout';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { SearchBar } from '../components/ui/Search';
+import { Skeleton } from '../components/ui/Skeleton';
+import { EmptyState } from '../components/ui/EmptyState';
+import { useToast } from '../components/ui/Toast';
 import { MemberStatus } from '../types';
 
 // Form schema for creating/editing members
@@ -36,10 +39,12 @@ type MemberFormValues = z.infer<typeof memberSchema>;
 const MemberManagementPage = () => {
   const { state, addMember, updateMember, deleteMember } = useApp();
   const { members, clubs, selectedClub, loading, error } = state;
+  const { addToast } = useToast();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<MemberStatus | 'ALL'>('ALL');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const {
     register,
@@ -99,26 +104,61 @@ const MemberManagementPage = () => {
       return statusOrder[a.status] - statusOrder[b.status];
     });
 
-  const onSubmit = (data: MemberFormValues) => {
+  const onSubmit = async (data: MemberFormValues) => {
+    setIsSubmitting(true);
+    
     const memberData = {
       ...data,
       joinDate: data.joinDate || new Date().toISOString().split('T')[0],
     };
 
-    if (editingMember) {
-      updateMember(editingMember, memberData);
-      setEditingMember(null);
-    } else {
-      addMember(memberData);
-      setIsAddModalOpen(false);
-    }
+    try {
+      if (editingMember) {
+        updateMember(editingMember, memberData);
+        setEditingMember(null);
+        addToast({
+          title: "Success",
+          message: "Member updated successfully",
+          type: "success"
+        });
+      } else {
+        addMember(memberData);
+        setIsAddModalOpen(false);
+        addToast({
+          title: "Success", 
+          message: "Member added successfully",
+          type: "success"
+        });
+      }
 
-    reset();
+      reset();
+    } catch (error) {
+      addToast({
+        title: "Error",
+        message: "Failed to save member",
+        type: "error"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleDeleteMember = (memberId: string) => {
     if (window.confirm('Are you sure you want to delete this member?')) {
-      deleteMember(memberId);
+      try {
+        deleteMember(memberId);
+        addToast({
+          title: "Success",
+          message: "Member deleted successfully",
+          type: "success"
+        });
+      } catch (error) {
+        addToast({
+          title: "Error", 
+          message: "Failed to delete member",
+          type: "error"
+        });
+      }
     }
   };
 
@@ -144,10 +184,36 @@ const MemberManagementPage = () => {
   if (loading) {
     return (
       <DashboardLayout>
-        <div className="flex items-center justify-center h-full">
-          <div className="flex flex-col items-center space-y-4">
-            <div className="w-12 h-12 border-4 border-t-primary-500 rounded-full animate-spin"></div>
-            <p className="text-lg font-medium">Loading member data...</p>
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-10 w-32" />
+          </div>
+          
+          <div className="flex gap-4">
+            <Skeleton className="h-10 flex-1" />
+            <Skeleton className="h-10 w-32" />
+          </div>
+
+          <div className="grid gap-4">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm">
+                <div className="flex justify-between items-start">
+                  <div className="space-y-3 flex-1">
+                    <Skeleton className="h-6 w-48" />
+                    <div className="flex gap-4">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-4 w-40" />
+                    </div>
+                    <Skeleton className="h-4 w-64" />
+                  </div>
+                  <div className="flex gap-2">
+                    <Skeleton className="h-8 w-8" />
+                    <Skeleton className="h-8 w-8" />
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </DashboardLayout>
@@ -178,20 +244,19 @@ const MemberManagementPage = () => {
         )}
 
         <div className="flex flex-col md:flex-row gap-4">
-          {/* Search */}
+          {/* Enhanced Search */}
           <div className="flex-grow md:max-w-md">
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
-              </div>
-              <Input
-                type="text"
-                placeholder="Search members..."
-                className="pl-10"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
+            <SearchBar
+              value={searchTerm}
+              onChange={setSearchTerm}
+              placeholder="Search members by name, email, phone..."
+              suggestions={members
+                .filter(member => member.name.toLowerCase().includes(searchTerm.toLowerCase()))
+                .slice(0, 5)
+                .map(member => member.name)
+              }
+              onSuggestionSelect={(suggestion) => setSearchTerm(suggestion)}
+            />
           </div>
 
           {/* Filter */}
@@ -327,8 +392,28 @@ const MemberManagementPage = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                      No members found
+                    <td colSpan={5} className="p-0">
+                      <EmptyState
+                        icon={<UsersIcon className="w-12 h-12" />}
+                        title="No members found"
+                        description={searchTerm || statusFilter !== 'ALL' 
+                          ? "Try adjusting your search or filter criteria"
+                          : "Get started by adding your first member to the community"
+                        }
+                        action={
+                          searchTerm || statusFilter !== 'ALL' ? {
+                            label: "Clear filters",
+                            onClick: () => {
+                              setSearchTerm('');
+                              setStatusFilter('ALL');
+                            },
+                            variant: "outline" as const
+                          } : {
+                            label: "Add First Member",
+                            onClick: () => setIsAddModalOpen(true)
+                          }
+                        }
+                      />
                     </td>
                   </tr>
                 )}
@@ -369,6 +454,7 @@ const MemberManagementPage = () => {
                     {...register('phone')}
                     placeholder="Phone Number"
                     error={errors.phone?.message}
+                    icon={<PhoneIcon className="w-5 h-5" />}
                   />
                 </div>
                 
@@ -381,6 +467,7 @@ const MemberManagementPage = () => {
                     type="email"
                     placeholder="email@example.com"
                     error={errors.email?.message}
+                    icon={<EnvelopeIcon className="w-5 h-5" />}
                   />
                 </div>
                 
@@ -449,7 +536,11 @@ const MemberManagementPage = () => {
                   >
                     Cancel
                   </Button>
-                  <Button type="submit">
+                  <Button 
+                    type="submit"
+                    loading={isSubmitting}
+                    disabled={isSubmitting}
+                  >
                     {editingMember ? 'Update Member' : 'Add Member'}
                   </Button>
                 </div>

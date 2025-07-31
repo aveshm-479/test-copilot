@@ -4,9 +4,11 @@ import { motion } from 'framer-motion';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { UserIcon, LockClosedIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { useToast } from '../components/ui/Toast';
 
 const loginSchema = z.object({
   username: z.string().min(1, { message: "Username is required" }),
@@ -18,6 +20,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 const LoginPage = () => {
   const navigate = useNavigate();
   const { login, authState } = useAuth();
+  const { addToast } = useToast();
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   const {
@@ -36,9 +39,19 @@ const LoginPage = () => {
     setIsLoggingIn(true);
     try {
       await login(data.username, data.password);
+      addToast({
+        title: "Welcome back!",
+        message: "Successfully logged in",
+        type: "success"
+      });
       navigate('/dashboard');
     } catch (error) {
       console.error('Login failed:', error);
+      addToast({
+        title: "Login failed",
+        message: "Please check your credentials and try again",
+        type: "error"
+      });
     } finally {
       setIsLoggingIn(false);
     }
@@ -91,14 +104,11 @@ const LoginPage = () => {
                   id="username"
                   type="text"
                   autoComplete="username"
+                  placeholder="Enter your username"
+                  icon={<UserIcon className="w-5 h-5" />}
+                  error={errors.username?.message}
                   {...register('username')}
-                  className={errors.username ? 'border-red-500 dark:border-red-400' : ''}
                 />
-                {errors.username && (
-                  <p className="mt-1 text-sm text-red-500 dark:text-red-400">
-                    {errors.username.message}
-                  </p>
-                )}
               </div>
             </div>
 
@@ -114,14 +124,12 @@ const LoginPage = () => {
                   id="password"
                   type="password"
                   autoComplete="current-password"
+                  placeholder="Enter your password"
+                  icon={<LockClosedIcon className="w-5 h-5" />}
+                  showPasswordToggle
+                  error={errors.password?.message}
                   {...register('password')}
-                  className={errors.password ? 'border-red-500 dark:border-red-400' : ''}
                 />
-                {errors.password && (
-                  <p className="mt-1 text-sm text-red-500 dark:text-red-400">
-                    {errors.password.message}
-                  </p>
-                )}
               </div>
             </div>
           </div>
@@ -142,35 +150,10 @@ const LoginPage = () => {
               variant="default"
               animation="tilt"
               className="relative w-full"
+              loading={isLoggingIn}
               disabled={isLoggingIn}
             >
-              {isLoggingIn ? (
-                <span className="flex items-center justify-center">
-                  <svg
-                    className="w-5 h-5 mr-2 animate-spin"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
-                  Signing in...
-                </span>
-              ) : (
-                "Sign in"
-              )}
+              Sign in
             </Button>
           </div>
 

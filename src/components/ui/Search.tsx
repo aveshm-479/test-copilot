@@ -32,18 +32,18 @@ export const SearchBar = ({
 }: SearchBarProps) => {
   const [isFocused, setIsFocused] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [debouncedValue, setDebouncedValue] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Debounce the search value
   useEffect(() => {
     const timer = setTimeout(() => {
-      setDebouncedValue(value);
+      // Trigger onChange after debounce delay
+      onChange(value);
     }, debounceMs);
 
     return () => clearTimeout(timer);
-  }, [value, debounceMs]);
+  }, [value, debounceMs, onChange]);
 
   // Filter suggestions based on current value
   const filteredSuggestions = suggestions.filter(suggestion =>

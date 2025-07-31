@@ -17,6 +17,10 @@ import DashboardLayout from '../components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { SearchBar } from '../components/ui/Search';
+import { Skeleton } from '../components/ui/Skeleton';
+import { EmptyState } from '../components/ui/EmptyState';
+import { useToast } from '../components/ui/Toast';
 
 // Form schema for creating/editing clubs
 const clubSchema = z.object({
@@ -32,14 +36,24 @@ type ClubFormValues = z.infer<typeof clubSchema>;
 const ClubManagementPage = () => {
   const { state, addClub, updateClub, deleteClub } = useApp();
   const { clubs, users, loading, error } = state;
+  const { addToast } = useToast();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingClub, setEditingClub] = useState<string | null>(null);
   const [selectedAdmins, setSelectedAdmins] = useState<string[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Filter only admin users for assignment
   const adminUsers = users?.filter(user => 
     user.role === 'ADMIN' || user.role === 'SUPER_ADMIN'
   ) || [];
+
+  // Filter clubs based on search term
+  const filteredClubs = (clubs || []).filter(club =>
+    club.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    club.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    club.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const {
     register,
@@ -86,27 +100,62 @@ const ClubManagementPage = () => {
     });
   };
 
-  const onSubmit = (data: ClubFormValues) => {
+  const onSubmit = async (data: ClubFormValues) => {
+    setIsSubmitting(true);
+    
     const clubData = {
       ...data,
       adminIds: selectedAdmins,
     };
 
-    if (editingClub) {
-      updateClub(editingClub, clubData);
-      setEditingClub(null);
-    } else {
-      addClub(clubData);
-      setIsAddModalOpen(false);
-    }
+    try {
+      if (editingClub) {
+        updateClub(editingClub, clubData);
+        setEditingClub(null);
+        addToast({
+          title: "Success",
+          message: "Club updated successfully",
+          type: "success"
+        });
+      } else {
+        addClub(clubData);
+        setIsAddModalOpen(false);
+        addToast({
+          title: "Success",
+          message: "Club added successfully",
+          type: "success"
+        });
+      }
 
-    reset();
-    setSelectedAdmins([]);
+      reset();
+      setSelectedAdmins([]);
+    } catch (error) {
+      addToast({
+        title: "Error",
+        message: "Failed to save club",
+        type: "error"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleDeleteClub = (clubId: string) => {
     if (window.confirm('Are you sure you want to delete this club?')) {
-      deleteClub(clubId);
+      try {
+        deleteClub(clubId);
+        addToast({
+          title: "Success",
+          message: "Club deleted successfully",
+          type: "success"
+        });
+      } catch (error) {
+        addToast({
+          title: "Error",
+          message: "Failed to delete club",
+          type: "error"
+        });
+      }
     }
   };
 
@@ -117,10 +166,48 @@ const ClubManagementPage = () => {
   if (loading) {
     return (
       <DashboardLayout>
-        <div className="flex items-center justify-center h-full">
-          <div className="flex flex-col items-center space-y-4">
-            <div className="w-12 h-12 border-4 border-t-primary-500 rounded-full animate-spin"></div>
-            <p className="text-lg font-medium">Loading club data...</p>
+        <div className="space-y-8">
+          {/* Header Skeleton */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Skeleton className="w-6 h-6" />
+              <Skeleton className="h-8 w-48" />
+            </div>
+            <Skeleton className="h-10 w-32" />
+          </div>
+
+          {/* Search Bar Skeleton */}
+          <div className="flex justify-center">
+            <Skeleton className="h-10 w-full max-w-md" />
+          </div>
+
+          {/* Club Cards Skeleton */}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+                <div className="flex justify-between items-start mb-4">
+                  <Skeleton className="h-6 w-32" />
+                  <div className="flex space-x-2">
+                    <Skeleton className="h-8 w-8" />
+                    <Skeleton className="h-8 w-8" />
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-start space-x-2">
+                    <Skeleton className="w-5 h-5 mt-0.5" />
+                    <Skeleton className="h-4 w-full" />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Skeleton className="w-5 h-5" />
+                    <Skeleton className="h-4 w-28" />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Skeleton className="w-5 h-5" />
+                    <Skeleton className="h-4 w-40" />
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </DashboardLayout>
@@ -150,14 +237,32 @@ const ClubManagementPage = () => {
           </div>
         )}
 
+        {/* Search Bar */}
+        <div className="flex justify-center">
+          <div className="w-full max-w-md">
+            <SearchBar
+              value={searchTerm}
+              onChange={setSearchTerm}
+              placeholder="Search clubs by name, address, or email..."
+              suggestions={clubs
+                ?.filter(club => club.name.toLowerCase().includes(searchTerm.toLowerCase()))
+                .slice(0, 5)
+                .map(club => club.name) || []
+              }
+              onSuggestionSelect={(suggestion) => setSearchTerm(suggestion)}
+            />
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {(clubs || []).map((club) => (
-            <motion.div
-              key={club.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-            >
+          {filteredClubs.length > 0 ? (
+            filteredClubs.map((club) => (
+              <motion.div
+                key={club.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+              >
               <Card className="overflow-hidden hover:shadow-md transition-all duration-300 dark:border-gray-700">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-lg font-medium">{club.name}</CardTitle>
@@ -223,7 +328,25 @@ const ClubManagementPage = () => {
                 </CardContent>
               </Card>
             </motion.div>
-          ))}
+          ))
+          ) : (
+            <div className="col-span-full">
+              <EmptyState
+                icon={<BuildingOffice2Icon className="w-12 h-12" />}
+                title="No clubs found"
+                description={searchTerm 
+                  ? "Try adjusting your search criteria"
+                  : "Get started by adding your first club to the community"
+                }
+                action={{
+                  label: searchTerm ? "Clear search" : "Add First Club",
+                  onClick: searchTerm 
+                    ? () => setSearchTerm('') 
+                    : () => setIsAddModalOpen(true)
+                }}
+              />
+            </div>
+          )}
         </div>
 
         {/* Add/Edit Club Modal */}
@@ -326,7 +449,11 @@ const ClubManagementPage = () => {
                   >
                     Cancel
                   </Button>
-                  <Button type="submit">
+                  <Button 
+                    type="submit"
+                    loading={isSubmitting}
+                    disabled={isSubmitting}
+                  >
                     {editingClub ? 'Update Club' : 'Add Club'}
                   </Button>
                 </div>
