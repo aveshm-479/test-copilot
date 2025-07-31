@@ -25,7 +25,7 @@ function App() {
       <ToastProvider>
         <AuthProvider>
           <AppProvider>
-            <Router>
+            <Router basename="/test-copilot">
             <Routes>
               <Route path="/login" element={<LoginPage />} />
               
